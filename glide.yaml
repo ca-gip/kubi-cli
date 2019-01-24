@@ -1,0 +1,7 @@
+package: intomy.land/kube-ldap-client
+import:
+- package: github.com/howeyc/gopass
+- package: github.com/go-ozzo/ozzo-validation
+  version: ^3.5.0
+- package: github.com/asaskevich/govalidator
+  version: ^9.0.0
