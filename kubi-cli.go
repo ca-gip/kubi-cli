@@ -85,7 +85,7 @@ func main() {
 	resp, err := secureClient.Do(req)
 	check(err)
 	tokenbody, err := ioutil.ReadAll(resp.Body)
-	if resp.StatusCode != http.StatusOK {
+	if resp.StatusCode != http.StatusCreated {
 		fmt.Printf("Error http %d during authentication\n", resp.StatusCode)
 		fmt.Printf("Details: %v\n", string(tokenbody))
 		os.Exit(1)
