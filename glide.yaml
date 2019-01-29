@@ -1,4 +1,4 @@
-package: intomy.land/kube-ldap-client
+package: github.com/ca-gip/kubi-cli
 import:
 - package: github.com/howeyc/gopass
 - package: github.com/go-ozzo/ozzo-validation

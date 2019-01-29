@@ -87,7 +87,6 @@ func main() {
 	tokenbody, err := ioutil.ReadAll(resp.Body)
 	if resp.StatusCode != http.StatusCreated {
 		fmt.Printf("Error http %d during authentication\n", resp.StatusCode)
-		fmt.Printf("Details: %v\n", string(tokenbody))
 		os.Exit(1)
 	}
 
