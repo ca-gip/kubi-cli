@@ -102,6 +102,9 @@ func main() {
 		transport := &http.Transport{
 			TLSClientConfig: tlsConfig,
 		}
+		if *useProxy {
+			transport.Proxy = http.ProxyFromEnvironment
+		}
 		secureClient.Transport = transport
 		resp, err = secureClient.Do(req)
 	}
