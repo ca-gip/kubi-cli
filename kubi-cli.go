@@ -57,6 +57,8 @@ func main() {
 	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	if *useProxy {
 		http.DefaultTransport.(*http.Transport).Proxy = http.ProxyFromEnvironment
+	} else {
+		http.DefaultTransport.(*http.Transport).Proxy = nil
 	}
 	caResp, err := http.DefaultClient.Get(*kubiUrl + "/ca")
 	check(err)
