@@ -109,6 +109,7 @@ func main() {
 	if *generateConfig {
 		user, err := user.Current()
 		check(err)
+		os.MkdirAll(user.HomeDir + "/.kube", 0600)
 		f, err := os.Create(user.HomeDir + "/.kube/config")
 		check(err)
 		f.Write(tokenbody)
