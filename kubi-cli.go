@@ -30,6 +30,7 @@ func main() {
 	generateConfig := flag.Bool("generate-config", false, "Generate a config in ~/.kube/config")
 	insecure := flag.Bool("insecure", false, "Skip TLS verification")
 	username := flag.String("username", "", "Ldap username ( not dn )")
+	useProxy := flag.Bool("use-proxy", false, "Use default proxy or not")
 	flag.Parse()
 
 	if len(*username) == 0 {
@@ -54,6 +55,9 @@ func main() {
 
 	// Gathering CA for cluster in insecure mode
 	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+	if *useProxy {
+		http.DefaultTransport.(*http.Transport).Proxy = http.ProxyFromEnvironment
+	}
 	caResp, err := http.DefaultClient.Get(*kubiUrl + "/ca")
 	check(err)
 	body, err := ioutil.ReadAll(caResp.Body)
@@ -68,6 +72,9 @@ func main() {
 	if *insecure {
 		transport := &http.Transport{
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		}
+		if *useProxy {
+			transport.Proxy = http.ProxyFromEnvironment
 		}
 		insecureClient := http.Client{}
 		insecureClient.Transport = transport
@@ -109,7 +116,7 @@ func main() {
 	if *generateConfig {
 		user, err := user.Current()
 		check(err)
-		os.MkdirAll(user.HomeDir + "/.kube", 0600)
+		os.MkdirAll(user.HomeDir+"/.kube", 0600)
 		f, err := os.Create(user.HomeDir + "/.kube/config")
 		check(err)
 		f.Write(tokenbody)
