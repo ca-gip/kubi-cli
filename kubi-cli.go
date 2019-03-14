@@ -28,6 +28,7 @@ func main() {
 
 	kubiUrl := flag.String("kubi-url", "", "Url to kubi server (ex: https://<kubi-ip>:<kubi-port>")
 	generateConfig := flag.Bool("generate-config", false, "Generate a config in ~/.kube/config")
+	generateToken := flag.Bool("generate-token", false, "Generate a token only")
 	insecure := flag.Bool("insecure", false, "Skip TLS verification")
 	username := flag.String("username", "", "Ldap username ( not dn )")
 	useProxy := flag.Bool("use-proxy", false, "Use default proxy or not")
@@ -66,7 +67,11 @@ func main() {
 	check(err)
 	ca := body
 
-	req, err := http.NewRequest(http.MethodGet, *kubiUrl+"/config", nil)
+	url := *kubiUrl + "/config"
+	if *generateToken {
+		url = *kubiUrl + "/token"
+	}
+	req, err := http.NewRequest(http.MethodGet, url, nil)
 	req.SetBasicAuth(*username, string(bytePassword))
 
 	var resp *http.Response
@@ -128,6 +133,8 @@ func main() {
 		f.Chmod(0600)
 		f.Close()
 		fmt.Printf("Great ! Your config has been saved in %s\n", f.Name())
+	} else if *generateToken {
+		fmt.Println(string(tokenbody))
 	} else {
 		fmt.Println("\n\nGreat ! You can use --generate-config to directly save it in ~/.kube/config next time ! \n\n")
 		fmt.Println(string(tokenbody))
