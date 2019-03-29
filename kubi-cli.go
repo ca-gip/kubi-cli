@@ -14,8 +14,11 @@ import (
 	"os/user"
 	"strings"
 	"syscall"
+	"gopkg.in/yaml.v2"
+	"fmt"
+	"encoding/base64"
+	"encoding/json"
 )
-import "fmt"
 
 func check(e error) {
 	if e != nil {
@@ -24,15 +27,95 @@ func check(e error) {
 	}
 }
 
+type Conf struct {
+	APIVersion string `json:"apiVersion"`
+	Clusters   []struct {
+		Cluster struct {
+			CertificateAuthorityData string `json:"certificate-authority-data"`
+			Server                   string `json:"server"`
+		} `json:"cluster"`
+		Name string `json:"name"`
+	} `json:"clusters"`
+	Contexts []struct {
+		Context struct {
+			Cluster   string `json:"cluster"`
+			Namespace string `json:"namespace"`
+			User      string `json:"user"`
+		} `json:"context"`
+		Name string `json:"name"`
+	} `json:"contexts"`
+	CurrentContext string `json:"current-context"`
+	Kind           string `json:"kind"`
+	Preferences    struct {
+	} `json:"preferences"`
+	Users []struct {
+		Name string `json:"name"`
+		User struct {
+			Token string `json:"token"`
+		} `json:"user"`
+	} `json:"users"`
+}
+
+type JWT_rights struct {
+	Auths []struct {
+		Namespace string `json:"namespace"`
+		Role      string `json:"role"`
+	} `json:"auths"`
+	User        string `json:"user"`
+	AdminAccess bool   `json:"adminAccess"`
+	Exp         int    `json:"exp"`
+	Iss         string `json:"iss"`
+}
+
+func unmarshal_config (path string) Conf {
+	confYaml, err := ioutil.ReadFile(path)
+	var config Conf
+	err = yaml.Unmarshal(confYaml, &config)
+	if err != nil {
+		panic(err)
+	}
+	return config
+}
+
 func main() {
 
 	kubiUrl := flag.String("kubi-url", "", "Url to kubi server (ex: https://<kubi-ip>:<kubi-port>")
 	generateConfig := flag.Bool("generate-config", false, "Generate a config in ~/.kube/config")
-	generateToken := flag.Bool("generate-token", false, "Generate a token only")
+	generateToken := flag.Bool("generate-token", true, "Generate a token only")
 	insecure := flag.Bool("insecure", false, "Skip TLS verification")
 	username := flag.String("username", "", "Ldap username ( not dn )")
 	useProxy := flag.Bool("use-proxy", false, "Use default proxy or not")
 	flag.Parse()
+
+	user, err := user.Current()
+	check(err)
+	if len(os.Args)>1 {
+		switch os.Args[1] {
+			case "get-config":
+				config := unmarshal_config(user.HomeDir + "/.kube/config")
+				b64_token := strings.Split(config.Users[0].User.Token,".")[1]
+				//Add the base64 padding
+				l := len(b64_token)%4
+				if l%4 > 0 {
+					b64_token += strings.Repeat("=", 4-l)
+				}
+				data, err := base64.StdEncoding.DecodeString(b64_token)				
+				var jwt JWT_rights
+				err = json.Unmarshal(data, &jwt)
+				if err != nil {
+					panic(err)
+				}
+				var namespaces string
+				for i := 0; i < len(jwt.Auths); i++ {
+					namespaces +=  jwt.Auths[i].Namespace + "\n"
+				}
+				fmt.Println("User\n----\n"+config.Users[0].Name+"\n\nCluster\n-------\n"+config.Clusters[0].Cluster.Server+"\n\nNamespaces\n----------\n"+namespaces)
+				os.Exit(1)
+			default:
+				fmt.Println("Unkwown command.")
+				os.Exit(1)
+		}
+	}
 
 	if len(*username) == 0 {
 		fmt.Println("No username found, please add '--username <username>' argument !")
@@ -46,7 +129,7 @@ func main() {
 	if !strings.HasPrefix(*kubiUrl, "https://") {
 		*kubiUrl = "https://" + *kubiUrl
 	}
-	err := validation.Validate(&kubiUrl, is.RequestURL)
+	err = validation.Validate(&kubiUrl, is.RequestURL)
 	check(err)
 
 	fmt.Print("Enter your Ldap password: ")
@@ -124,8 +207,6 @@ func main() {
 	check(err)
 
 	if *generateConfig {
-		user, err := user.Current()
-		check(err)
 		os.MkdirAll(user.HomeDir+"/.kube", 0600)
 		f, err := os.Create(user.HomeDir + "/.kube/config")
 		check(err)
