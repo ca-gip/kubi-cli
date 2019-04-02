@@ -164,7 +164,7 @@ func main() {
 		}
 	
 	//Default connexion command
-	} else if len(os.Args) == 0 {
+	} else if len(os.Args) == 1 {
 		if len(*username) == 0 {
 			fmt.Println("No username found, please add '--username <username>' argument !")
 			os.Exit(1)
