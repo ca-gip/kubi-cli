@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"encoding/base64"
 	"encoding/json"
+	"time"
 )
 
 func check(e error) {
@@ -99,17 +100,19 @@ func main() {
 				if l%4 > 0 {
 					b64_token += strings.Repeat("=", 4-l)
 				}
-				data, err := base64.StdEncoding.DecodeString(b64_token)				
+				data, err := base64.StdEncoding.DecodeString(b64_token)
 				var jwt JWT_rights
 				err = json.Unmarshal(data, &jwt)
-				if err != nil {
-					panic(err)
-				}
+				check(err)
 				var namespaces string
 				for i := 0; i < len(jwt.Auths); i++ {
 					namespaces +=  jwt.Auths[i].Namespace + "\n"
 				}
-				fmt.Println("User\n----\n"+config.Users[0].Name+"\n\nCluster\n-------\n"+config.Clusters[0].Cluster.Server+"\n\nNamespaces\n----------\n"+namespaces)
+				var expires_int int64
+				expires_int = int64(jwt.Exp)
+				unixTimeUTC:=time.Unix(expires_int, 0) //gives unix time stamp in utc 
+				expires := unixTimeUTC.Format(time.RFC3339)
+				fmt.Println("User\n----\n"+config.Users[0].Name+"\n\nCluster\n-------\n"+config.Clusters[0].Cluster.Server+"\n\nNamespaces\n----------\n"+namespaces+"\n\nExpires\n-------\n"+expires)
 				os.Exit(1)
 			default:
 				fmt.Println("Unkwown command.")
