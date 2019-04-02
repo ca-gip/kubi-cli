@@ -70,6 +70,7 @@ type JWT_rights struct {
 
 func unmarshal_config (path string) Conf {
 	confYaml, err := ioutil.ReadFile(path)
+	check(err)
 	var config Conf
 	err = yaml.Unmarshal(confYaml, &config)
 	check(err)
