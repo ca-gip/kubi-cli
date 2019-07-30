@@ -31,6 +31,7 @@ func main() {
 	generateToken := flag.Bool("generate-token", false, "Generate a token only")
 	insecure := flag.Bool("insecure", false, "Skip TLS verification")
 	username := flag.String("username", "", "Ldap username ( not dn )")
+	password := flag.String("password", "", "The password, use it at your own risks !")
 	useProxy := flag.Bool("use-proxy", false, "Use default proxy or not")
 	flag.Parse()
 
@@ -49,10 +50,13 @@ func main() {
 	err := validation.Validate(&kubiUrl, is.RequestURL)
 	check(err)
 
-	fmt.Print("Enter your Ldap password: ")
-	bytePassword, err := terminal.ReadPassword(int(syscall.Stdin))
-	fmt.Println()
-	check(err)
+	if len(*password) == 0 {
+		fmt.Print("Enter your Ldap password: ")
+		bytePassword, err := terminal.ReadPassword(int(syscall.Stdin))
+		fmt.Println()
+		check(err)
+		*password = string(bytePassword)
+	}
 
 	// Gathering CA for cluster in insecure mode
 	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
@@ -72,7 +76,7 @@ func main() {
 		url = *kubiUrl + "/token"
 	}
 	req, err := http.NewRequest(http.MethodGet, url, nil)
-	req.SetBasicAuth(*username, string(bytePassword))
+	req.SetBasicAuth(*username, *password)
 
 	var resp *http.Response
 
