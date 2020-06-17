@@ -33,6 +33,7 @@ func main() {
 	username := flag.String("username", "", "Ldap username ( not dn )")
 	password := flag.String("password", "", "The password, use it at your own risks !")
 	useProxy := flag.Bool("use-proxy", false, "Use default proxy or not")
+	scopes := flag.String("scopes", "", "The token scope ( default user ). For promote, use 'promote'.")
 	flag.Parse()
 
 	if len(*username) == 0 {
@@ -71,9 +72,9 @@ func main() {
 	check(err)
 	ca := body
 
-	url := *kubiUrl + "/config"
+	url := fmt.Sprintf("%v/config", *kubiUrl)
 	if *generateToken {
-		url = *kubiUrl + "/token"
+		url = fmt.Sprintf("%v/token?scopes=%v", *kubiUrl, scopes)
 	}
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	req.SetBasicAuth(*username, *password)
