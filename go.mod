@@ -1,9 +1,14 @@
 module github.com/ca-gip/kubi-cli
 
-go 1.13
+go 1.14
 
 require (
-	github.com/asaskevich/govalidator v0.0.0-20200428143746-21a406dcc535 // indirect
-	github.com/go-ozzo/ozzo-validation v3.6.0+incompatible
-	golang.org/x/crypto v0.0.0-20200604202706-70a84ac30bf9
+	github.com/TylerBrock/colorjson v0.0.0-20200706003622-8a50f05110d2
+	github.com/dgrijalva/jwt-go v3.2.0+incompatible
+	github.com/fatih/color v1.9.0 // indirect
+	github.com/go-ozzo/ozzo-validation/v4 v4.2.2
+	github.com/mitchellh/go-homedir v1.1.0
+	golang.org/x/crypto v0.0.0-20190820162420-60c769a6c586
+	k8s.io/apimachinery v0.16.6
+	k8s.io/client-go v0.16.6
 )

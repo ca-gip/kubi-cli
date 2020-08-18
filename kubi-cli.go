@@ -4,18 +4,24 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"flag"
-	"github.com/go-ozzo/ozzo-validation"
-	"github.com/go-ozzo/ozzo-validation/is"
+	"fmt"
+	"github.com/TylerBrock/colorjson"
+	"github.com/dgrijalva/jwt-go"
+	"github.com/go-ozzo/ozzo-validation/v4"
+	"github.com/go-ozzo/ozzo-validation/v4/is"
+	"github.com/mitchellh/go-homedir"
 	"golang.org/x/crypto/ssh/terminal"
 	"io/ioutil"
+	"k8s.io/apimachinery/pkg/util/json"
+	"k8s.io/client-go/tools/clientcmd"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"os/user"
 	"strings"
 	"syscall"
 )
-import "fmt"
 
 func check(e error) {
 	if e != nil {
@@ -25,16 +31,52 @@ func check(e error) {
 }
 
 func main() {
-
 	kubiUrl := flag.String("kubi-url", "", "Url to kubi server (ex: https://<kubi-ip>:<kubi-port>")
 	generateConfig := flag.Bool("generate-config", false, "Generate a config in ~/.kube/config")
 	generateToken := flag.Bool("generate-token", false, "Generate a token only")
 	insecure := flag.Bool("insecure", false, "Skip TLS verification")
 	username := flag.String("username", "", "Ldap username ( not dn )")
 	password := flag.String("password", "", "The password, use it at your own risks !")
-	useProxy := flag.Bool("use-proxy", false, "Use default proxy or not")
 	scopes := flag.String("scopes", "", "The token scope ( default user ). For promote, use 'promote'.")
+	useProxy := flag.Bool("use-proxy", false, "Use default proxy or not")
 	flag.Parse()
+
+	if flag.Arg(0) == "token" {
+		kubeconfigpath, err := findKubeConfig()
+		kubeConfig, err := clientcmd.LoadFromFile(kubeconfigpath)
+		if err != nil {
+			log.Fatal(err)
+		}
+		token := kubeConfig.AuthInfos[kubeConfig.Contexts[kubeConfig.CurrentContext].AuthInfo].Token
+
+		barry, err := jwt.DecodeSegment(strings.Split(token, ".")[1])
+
+		f := colorjson.NewFormatter()
+		f.Indent = 2
+
+		// Formatting json
+		var obj map[string]interface{}
+		json.Unmarshal(barry, &obj)
+
+		s, _ := f.Marshal(obj)
+		fmt.Println(string(s))
+
+		os.Exit(0)
+	}
+
+	if !*generateConfig && (!*generateToken && *scopes == "") {
+		fmt.Println("You should use --generate-token or --generate-config, for scopes, use only --scopes parameter")
+		os.Exit(1)
+	}
+
+	if *generateConfig && *generateToken {
+		fmt.Println("You should use either --generate-token or --generate-config")
+		os.Exit(1)
+	}
+
+	if len(*scopes) > 0 {
+		*generateToken = true
+	}
 
 	if len(*username) == 0 {
 		fmt.Println("No username found, please add '--username <username>' argument !")
@@ -72,11 +114,17 @@ func main() {
 	check(err)
 	ca := body
 
-	url := fmt.Sprintf("%v/config", *kubiUrl)
+	wurl := fmt.Sprintf("%v/config", *kubiUrl)
 	if *generateToken {
-		url = fmt.Sprintf("%v/token?scopes=%v", *kubiUrl, scopes)
+		base, _ := url.Parse(fmt.Sprintf("%v", *kubiUrl))
+		base.Path += "token"
+		params := url.Values{
+			"scopes": []string{*scopes},
+		}
+		base.RawQuery = params.Encode()
+		wurl = base.String()
 	}
-	req, err := http.NewRequest(http.MethodGet, url, nil)
+	req, err := http.NewRequest(http.MethodGet, wurl, nil)
 	req.SetBasicAuth(*username, *password)
 
 	var resp *http.Response
@@ -144,4 +192,17 @@ func main() {
 		fmt.Println("\n\nGreat ! You can use --generate-config to directly save it in ~/.kube/config next time ! \n\n")
 		fmt.Println(string(tokenbody))
 	}
+}
+
+// findKubeConfig finds path from env:KUBECONFIG or ~/.kube/config
+func findKubeConfig() (string, error) {
+	env := os.Getenv("KUBECONFIG")
+	if env != "" {
+		return env, nil
+	}
+	path, err := homedir.Expand("~/.kube/config")
+	if err != nil {
+		return "", err
+	}
+	return path, nil
 }
