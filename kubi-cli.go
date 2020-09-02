@@ -4,14 +4,16 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
-	"flag"
+	"errors"
 	"fmt"
 	"github.com/TylerBrock/colorjson"
+	"github.com/ca-gip/kubi-cli/internals"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/ghodss/yaml"
 	"github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/go-ozzo/ozzo-validation/v4/is"
 	"github.com/mitchellh/go-homedir"
+	flag "github.com/spf13/pflag"
 	"golang.org/x/crypto/ssh/terminal"
 	"io/ioutil"
 	"k8s.io/client-go/tools/clientcmd"
@@ -29,13 +31,6 @@ type PartialJWT struct {
 	ExpireAt int64 `json:"exp"`
 }
 
-func check(e error) {
-	if e != nil {
-		fmt.Println(e)
-		os.Exit(1)
-	}
-}
-
 // Explain a kubi token
 // if the token is provide as argument, then it explain the provided token
 // else it use the token in the default kube configuration
@@ -44,20 +39,22 @@ func explainCmd() {
 	if len(flag.Args()) > 1 {
 		token = flag.Arg(1)
 		if len(strings.Split(token, ".")) != 3 {
-			fmt.Printf("The token: \033[1;36m%s\033[0m is not a valid jwt token.\n", token)
-			os.Exit(1)
+			internal.ExitIfError(errors.New(fmt.Sprintf("The token: %s is not a valid jwt token.\n", token)))
 		}
 	} else {
-		fmt.Println("Using the kube config file for token explain")
+		internal.LogLightGray("Using the kube config file for token explain")
 		kubeconfigpath, err := findKubeConfig()
-		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
-		}
+		internal.ExitIfError(err)
+
 		kubeConfig, err := clientcmd.LoadFromFile(kubeconfigpath)
-		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+		internal.ExitIfError(err)
+
+		if kubeConfig.CurrentContext == internal.EmptyString {
+			internal.ExitIfError(errors.New("No current context found in kubeconfig"))
+		}
+		token = kubeConfig.AuthInfos[kubeConfig.Contexts[kubeConfig.CurrentContext].AuthInfo].Token
+		if token == internal.EmptyString {
+			internal.ExitIfError(errors.New(fmt.Sprintf("No token found for the context: %s", kubeConfig.CurrentContext)))
 		}
 		token = kubeConfig.AuthInfos[kubeConfig.Contexts[kubeConfig.CurrentContext].AuthInfo].Token
 	}
@@ -75,11 +72,8 @@ func explainCmd() {
 	fmt.Printf("\n\u001B[1;36mStatus:\u001B[0m\n\n")
 	fmt.Printf("  Expiration time: %v\n", tokenTime)
 	fmt.Printf("  Valid: %v\n", time.Now().Before(tokenTime))
+	internal.ExitIfError(err)
 
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
 	f := colorjson.NewFormatter()
 	f.Indent = 2
 
@@ -94,13 +88,17 @@ func explainCmd() {
 
 }
 
-func tokenCmd(kubiUrl *string, username *string, password *string, insecure *bool, useProxy *bool, scopes *string, update bool) {
+func tokenCmd(flagSet *flag.FlagSet, kubiUrl *string, username *string, password *string, insecure *bool, useProxy *bool, scopes *string, update bool) {
 	if len(*username) == 0 {
-		fmt.Println("No username found, please add '--username <username>' argument !")
+		internal.LogRed("No username found, please add '--username <username>' argument !")
+		internal.LogWhite("Supported Args:\n")
+		flagSet.PrintDefaults()
 		os.Exit(1)
 	}
 	if len(*kubiUrl) == 0 {
-		fmt.Println("No kubiUrl found, please add '--kubi-url https://<host,fqdn>:<port>' argument !")
+		internal.LogRed("No kubiUrl found, please add '--kubi-url https://<host,fqdn>:<port>' argument !")
+		internal.LogWhite("Supported Args:\n")
+		flagSet.PrintDefaults()
 		os.Exit(1)
 	}
 	// Gathering CA for cluster in insecure mode
@@ -108,7 +106,7 @@ func tokenCmd(kubiUrl *string, username *string, password *string, insecure *boo
 		*kubiUrl = "https://" + *kubiUrl
 	}
 	err := validation.Validate(&kubiUrl, is.RequestURL)
-	check(err)
+	internal.ExitIfError(err)
 	readPasswordIfEmpty(password)
 
 	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
@@ -117,12 +115,12 @@ func tokenCmd(kubiUrl *string, username *string, password *string, insecure *boo
 	} else {
 		http.DefaultTransport.(*http.Transport).Proxy = nil
 	}
-	check(err)
+	internal.ExitIfError(err)
 
 	caResp, err := http.DefaultClient.Get(*kubiUrl + "/ca")
-	check(err)
+	internal.ExitIfError(err)
 	body, err := ioutil.ReadAll(caResp.Body)
-	check(err)
+	internal.ExitIfError(err)
 	ca := body
 
 	base, _ := url.Parse(fmt.Sprintf("%v", *kubiUrl))
@@ -175,45 +173,45 @@ func tokenCmd(kubiUrl *string, username *string, password *string, insecure *boo
 		secureClient.Transport = transport
 		resp, err = secureClient.Do(req)
 	}
-	check(err)
+	internal.ExitIfError(err)
 
 	tokenbody, err := ioutil.ReadAll(resp.Body)
 	if resp.StatusCode != http.StatusCreated {
-		fmt.Printf("Error http %d during authentication\n", resp.StatusCode)
+		internal.LogRed("Error http %d during authentication\n", string(resp.StatusCode))
 		os.Exit(1)
 	}
 
 	if update {
-		fmt.Println("Rotating token in kube config file")
+		internal.LogLightGray("Rotating token in kube config file")
 		kubeconfigpath, err := findKubeConfig()
-		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
-		}
+		internal.ExitIfError(err)
+
 		kubeConfig, err := clientcmd.LoadFromFile(kubeconfigpath)
-		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
-		}
-		fmt.Println(string(tokenbody))
-		fmt.Println(fmt.Sprintf("kubernetes-%s", username))
+		internal.ExitIfError(err)
+
+		internal.LogLightGray(string(tokenbody))
+		internal.LogLightGray(fmt.Sprintf("kubernetes-%s", username))
 		kubeConfig.AuthInfos[kubeConfig.Contexts[fmt.Sprintf("kubernetes-%s", *username)].AuthInfo].Token = string(tokenbody)
 		yamlb, err := yaml.Marshal(kubeConfig)
 		ioutil.WriteFile(kubeconfigpath, yamlb, 0644)
 	}
 
-	check(err)
-	fmt.Println(string(tokenbody))
+	internal.ExitIfError(err)
+	internal.LogLightGray(string(tokenbody))
 
 }
 
-func configCmd(kubiUrl *string, username *string, password *string, insecure *bool, useProxy *bool) {
+func configCmd(flagSet *flag.FlagSet, kubiUrl *string, username *string, password *string, insecure *bool, useProxy *bool) {
 	if len(*username) == 0 {
-		fmt.Println("No username found, please add '--username <username>' argument !")
+		internal.LogRed("No username found, please add '--username <username>' argument !")
+		internal.LogWhite("Supported Args:\n")
+		flagSet.PrintDefaults()
 		os.Exit(1)
 	}
 	if len(*kubiUrl) == 0 {
-		fmt.Println("No kubiUrl found, please add '--kubi-url https://<host,fqdn>:<port>' argument !")
+		internal.LogRed("No kubiUrl found, please add '--kubi-url https://<host,fqdn>:<port>' argument !")
+		internal.LogWhite("Supported Args:\n")
+		flagSet.PrintDefaults()
 		os.Exit(1)
 	}
 	// Gathering CA for cluster in insecure mode
@@ -221,7 +219,7 @@ func configCmd(kubiUrl *string, username *string, password *string, insecure *bo
 		*kubiUrl = "https://" + *kubiUrl
 	}
 	err := validation.Validate(&kubiUrl, is.RequestURL)
-	check(err)
+	internal.ExitIfError(err)
 	readPasswordIfEmpty(password)
 	// Gathering CA for cluster in insecure mode
 	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
@@ -231,9 +229,9 @@ func configCmd(kubiUrl *string, username *string, password *string, insecure *bo
 		http.DefaultTransport.(*http.Transport).Proxy = nil
 	}
 	caResp, err := http.DefaultClient.Get(*kubiUrl + "/ca")
-	check(err)
+	internal.ExitIfError(err)
 	body, err := ioutil.ReadAll(caResp.Body)
-	check(err)
+	internal.ExitIfError(err)
 	ca := body
 
 	wurl := fmt.Sprintf("%v/config", *kubiUrl)
@@ -280,86 +278,99 @@ func configCmd(kubiUrl *string, username *string, password *string, insecure *bo
 		secureClient.Transport = transport
 		resp, err = secureClient.Do(req)
 	}
-	check(err)
+	internal.ExitIfError(err)
 
 	tokenbody, err := ioutil.ReadAll(resp.Body)
 	if resp.StatusCode != http.StatusCreated {
-		fmt.Printf("Error http %d during authentication\n", resp.StatusCode)
+		internal.LogRed("Error http %d during authentication\n", string(resp.StatusCode))
 		os.Exit(1)
 	}
 
-	check(err)
+	internal.ExitIfError(err)
 
 	user, err := user.Current()
-	check(err)
+	internal.ExitIfError(err)
 	os.MkdirAll(user.HomeDir+"/.kube", 0600)
 	f, err := os.Create(user.HomeDir + "/.kube/config")
-	check(err)
+	internal.ExitIfError(err)
 	f.Write(tokenbody)
 	f.Chmod(0600)
 	f.Close()
-	fmt.Printf("Great ! Your config has been saved in %s\n", f.Name())
+	internal.LogYellow("Great ! Your config has been saved in %s\n", f.Name())
 
 }
 
 func main() {
 
-	tokenFalg := flag.NewFlagSet("token", flag.ExitOnError)
-	tokenConfig := flag.NewFlagSet("config", flag.ExitOnError)
+	commonFlags := flag.NewFlagSet("commonFlags", flag.ExitOnError)
+	tokenFlags := flag.NewFlagSet("token", flag.ExitOnError)
+	configFlags := flag.NewFlagSet("config", flag.ExitOnError)
+	explainFlags := flag.NewFlagSet("explain", flag.ExitOnError)
+	oldFlags := flag.NewFlagSet("old", flag.ExitOnError)
 
-	switch os.Args[1] {
-	case "explain":
-		explainCmd()
-	case "token":
-		kubiUrl := tokenFalg.String("kubi-url", "", "Url to kubi server (ex: https://<kubi-ip>:<kubi-port>")
-		insecure := tokenFalg.Bool("insecure", false, "Skip TLS verification")
-		username := tokenFalg.String("username", "", "Ldap username ( not dn )")
-		password := tokenFalg.String("password", "", "The password, use it at your own risks !")
-		scopes := tokenFalg.String("scopes", "", "The token scope ( default user ). For promote, use 'promote'.")
-		useProxy := tokenFalg.Bool("use-proxy", false, "Use default proxy or not")
-		update := tokenFalg.Bool("update", false, "Update token directly in config")
-		tokenFalg.Parse(os.Args[2:])
-		tokenCmd(kubiUrl, username, password, insecure, useProxy, scopes, *update)
+	kubiUrl := commonFlags.String("kubi-url", internal.EmptyString, "Url to kubi server (ex: https://<kubi-ip>:<kubi-port>")
+	insecure := commonFlags.Bool("insecure", false, "Skip TLS verification")
+	username := commonFlags.String("username", internal.EmptyString, "Your username for connection")
+	password := commonFlags.String("password", internal.EmptyString, "The password, use it at your own risks !")
+	useProxy := commonFlags.Bool("use-proxy", false, "Use default proxy or not")
 
-	case "config":
-		kubiUrl := tokenConfig.String("kubi-url", "", "Url to kubi server (ex: https://<kubi-ip>:<kubi-port>")
-		insecure := tokenConfig.Bool("insecure", false, "Skip TLS verification")
-		username := tokenConfig.String("username", "", "Ldap username ( not dn )")
-		password := tokenConfig.String("password", "", "The password, use it at your own risks !")
-		useProxy := tokenConfig.Bool("use-proxy", false, "Use default proxy or not")
-		tokenConfig.Parse(os.Args[2:])
-		configCmd(kubiUrl, username, password, insecure, useProxy)
+	tokenFlags.AddFlagSet(commonFlags)
+	configFlags.AddFlagSet(commonFlags)
+	oldFlags.AddFlagSet(commonFlags)
 
-	default:
-		kubiUrl := flag.String("kubi-url", "", "Url to kubi server (ex: https://<kubi-ip>:<kubi-port>")
-		generateConfig := flag.Bool("generate-config", false, "Generate a config in ~/.kube/config")
-		generateToken := flag.Bool("generate-token", false, "Generate a token only")
-		insecure := flag.Bool("insecure", false, "Skip TLS verification")
-		username := flag.String("username", "", "Ldap username ( not dn )")
-		password := flag.String("password", "", "The password, use it at your own risks !")
-		useProxy := flag.Bool("use-proxy", false, "Use default proxy or not")
-		flag.Parse()
-		if *generateConfig {
-			fmt.Printf("\033[1;31m%s\033[0m\n", "Deprecated: Please use 'kubi config' instead of 'kubi --generate-config'")
+	if len(os.Args) > 1 {
+		switch os.Args[1] {
+		case "explain":
+			explainFlags.Parse(os.Args[2:])
+			explainCmd()
+		case "token":
+			scopes := tokenFlags.String("scopes", internal.EmptyString, "The token scope ( default user ). For promote, use 'promote'.")
+			update := tokenFlags.Bool("update", false, "Update token directly in config")
+			tokenFlags.Parse(os.Args[2:])
+			tokenCmd(tokenFlags, kubiUrl, username, password, insecure, useProxy, scopes, *update)
+
+		case "config":
+			configFlags.Parse(os.Args[2:])
+			configCmd(configFlags, kubiUrl, username, password, insecure, useProxy)
+
+		default:
+			generateConfig := oldFlags.Bool("generate-config", false, "Generate a config in ~/.kube/config")
+			generateToken := oldFlags.Bool("generate-token", false, "Generate a token only")
+			oldFlags.Parse(os.Args[1:])
+			if *generateConfig {
+				internal.LogReturn()
+				internal.LogRed("Deprecated: Please use 'kubi config' instead of 'kubi --generate-config'")
+				internal.LogReturn()
+
+			}
+			if *generateToken {
+				configCmd(oldFlags, kubiUrl, username, password, insecure, useProxy)
+			} else if *generateConfig {
+				configCmd(oldFlags, kubiUrl, username, password, insecure, useProxy)
+			} else {
+				internal.LogReturn()
+				internal.LogRed("\tThe usage of old command style is deprecated: please use kubi token, kubi config or kubi explain")
+				internal.LogRed("\tYou should use --generate-token or --generate-config, for scopes, use only --scopes parameter\n")
+				os.Exit(1)
+			}
 		}
-		if *generateToken {
-			configCmd(kubiUrl, username, password, insecure, useProxy)
-		} else if *generateConfig {
-			configCmd(kubiUrl, username, password, insecure, useProxy)
-		} else {
-			fmt.Println("You should use --generate-token or --generate-config, for scopes, use only --scopes parameter")
-			os.Exit(1)
-		}
+	} else {
+		internal.LogLightRed("\nNo argument specified, please internal.ExitIfError the documentation:")
+		internal.LogWhite("\n  kubi token: Generate / Update a kubi token\n  args:")
+		tokenFlags.PrintDefaults()
+		internal.LogWhite("\n  kubi config: Generate / Update a kube config\n  args:")
+		configFlags.PrintDefaults()
+		internal.LogWhite("\n  kubi explain: Generate / Update a kube config\n")
 	}
 
 }
 
 func readPasswordIfEmpty(password *string) {
 	if len(*password) == 0 {
-		fmt.Print("Enter your Ldap password: ")
+		fmt.Print("Enter your password: ")
 		bytePassword, err := terminal.ReadPassword(int(syscall.Stdin))
 		fmt.Println()
-		check(err)
+		internal.ExitIfError(err)
 		*password = string(bytePassword)
 	}
 }
@@ -367,12 +378,12 @@ func readPasswordIfEmpty(password *string) {
 // findKubeConfig finds path from env: KUBECONFIG or ~/.kube/config
 func findKubeConfig() (string, error) {
 	env := os.Getenv("KUBECONFIG")
-	if env != "" {
+	if env != internal.EmptyString {
 		return env, nil
 	}
 	path, err := homedir.Expand("~/.kube/config")
 	if err != nil {
-		return "", err
+		return internal.EmptyString, err
 	}
 	return path, nil
 }
