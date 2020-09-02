@@ -17,6 +17,10 @@ func LogLightGray(msg ...string) {
 	coloredLog("37", msg...)
 }
 
+func LogNormal(msg ...interface{}) {
+	fmt.Println(msg...)
+}
+
 func LogLightRed(msg ...string) {
 	coloredLog("91", msg...)
 }

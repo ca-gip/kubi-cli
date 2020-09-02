@@ -9,7 +9,6 @@ import (
 	"github.com/TylerBrock/colorjson"
 	"github.com/ca-gip/kubi-cli/internals"
 	"github.com/dgrijalva/jwt-go"
-	"github.com/ghodss/yaml"
 	"github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/go-ozzo/ozzo-validation/v4/is"
 	"github.com/mitchellh/go-homedir"
@@ -34,10 +33,10 @@ type PartialJWT struct {
 // Explain a kubi token
 // if the token is provide as argument, then it explain the provided token
 // else it use the token in the default kube configuration
-func explainCmd() {
+func explainCmd(flagSet *flag.FlagSet) {
 	var token string
-	if len(flag.Args()) > 1 {
-		token = flag.Arg(1)
+	if len(flagSet.Args()) == 1 {
+		token = flagSet.Arg(0)
 		if len(strings.Split(token, ".")) != 3 {
 			internal.ExitIfError(errors.New(fmt.Sprintf("The token: %s is not a valid jwt token.\n", token)))
 		}
@@ -59,19 +58,19 @@ func explainCmd() {
 		token = kubeConfig.AuthInfos[kubeConfig.Contexts[kubeConfig.CurrentContext].AuthInfo].Token
 	}
 
-	barry, err := jwt.DecodeSegment(strings.Split(token, ".")[1])
+	tokenTxt, err := jwt.DecodeSegment(strings.Split(token, ".")[1])
 
 	// Deserialize ExpireAt Field only
 	var v PartialJWT
-	_ = json.Unmarshal(barry, &v)
+	_ = json.Unmarshal(tokenTxt, &v)
 
-	fmt.Printf("\n\u001B[1;36mRaw Token:\u001B[0m\n\n")
-	fmt.Printf("  %v\n", token)
+	internal.LogWhite("\nRaw Token:\n")
+	internal.LogNormal(token)
 
 	tokenTime := time.Unix(v.ExpireAt, 0)
-	fmt.Printf("\n\u001B[1;36mStatus:\u001B[0m\n\n")
-	fmt.Printf("  Expiration time: %v\n", tokenTime)
-	fmt.Printf("  Valid: %v\n", time.Now().Before(tokenTime))
+	internal.LogWhite("\nStatus:\n")
+	internal.LogNormal("  Expiration time: ", tokenTime.String())
+	internal.LogNormal("  Valid: ", time.Now().Before(tokenTime))
 	internal.ExitIfError(err)
 
 	f := colorjson.NewFormatter()
@@ -79,7 +78,7 @@ func explainCmd() {
 
 	// Formatting json
 	var obj map[string]interface{}
-	json.Unmarshal(barry, &obj)
+	json.Unmarshal(tokenTxt, &obj)
 
 	s, _ := f.Marshal(obj)
 	fmt.Println("\n\u001B[1;36mToken body:\u001B[0m\n")
@@ -189,11 +188,14 @@ func tokenCmd(flagSet *flag.FlagSet, kubiUrl *string, username *string, password
 		kubeConfig, err := clientcmd.LoadFromFile(kubeconfigpath)
 		internal.ExitIfError(err)
 
-		internal.LogLightGray(string(tokenbody))
-		internal.LogLightGray(fmt.Sprintf("kubernetes-%s", username))
-		kubeConfig.AuthInfos[kubeConfig.Contexts[fmt.Sprintf("kubernetes-%s", *username)].AuthInfo].Token = string(tokenbody)
-		yamlb, err := yaml.Marshal(kubeConfig)
-		ioutil.WriteFile(kubeconfigpath, yamlb, 0644)
+		clusterName := strings.TrimPrefix(*kubiUrl, "https://kubi")
+		username := fmt.Sprintf("%s_%s", *username, clusterName)
+
+		internal.LogLightGray("The user will be", username)
+		kubeConfig.AuthInfos[kubeConfig.Contexts[username].AuthInfo].Token = string(tokenbody)
+		clientcmd.WriteToFile(*kubeConfig, kubeconfigpath)
+		internal.LogYellow("The token has successfully been rotated !")
+		os.Exit(0)
 	}
 
 	internal.ExitIfError(err)
@@ -282,7 +284,7 @@ func configCmd(flagSet *flag.FlagSet, kubiUrl *string, username *string, passwor
 
 	tokenbody, err := ioutil.ReadAll(resp.Body)
 	if resp.StatusCode != http.StatusCreated {
-		internal.LogRed("Error http %d during authentication\n", string(resp.StatusCode))
+		internal.LogRed(fmt.Sprintf("Error http %d during authentication\n", resp.StatusCode))
 		os.Exit(1)
 	}
 
@@ -290,13 +292,52 @@ func configCmd(flagSet *flag.FlagSet, kubiUrl *string, username *string, passwor
 
 	user, err := user.Current()
 	internal.ExitIfError(err)
-	os.MkdirAll(user.HomeDir+"/.kube", 0600)
-	f, err := os.Create(user.HomeDir + "/.kube/config")
+
+	kubeconfigpath, err := findKubeConfig()
 	internal.ExitIfError(err)
-	f.Write(tokenbody)
-	f.Chmod(0600)
-	f.Close()
-	internal.LogYellow("Great ! Your config has been saved in %s\n", f.Name())
+
+	if !internal.FileExists(kubeconfigpath) {
+		internal.LogNormal("Kubeconfig doesn't existing, it will be created.")
+		os.MkdirAll(user.HomeDir+"/.kube", 0600)
+		f, err := os.Create(user.HomeDir + "/.kube/config")
+		internal.ExitIfError(err)
+		f.Chmod(0600)
+		internal.ExitIfError(err)
+
+		newKubeConfig, err := clientcmd.Load(tokenbody)
+		internal.ExitIfError(err)
+		clientcmd.WriteToFile(*newKubeConfig, kubeconfigpath)
+
+		internal.LogReturn()
+		internal.LogYellow("Great ! Your config has been created in ", kubeconfigpath)
+		internal.LogReturn()
+
+	} else {
+		existingKubeConfig, err := clientcmd.LoadFromFile(kubeconfigpath)
+		internal.ExitIfError(err)
+		newKubeConfig, err := clientcmd.Load(tokenbody)
+		internal.ExitIfError(err)
+
+		// Merging Clusters
+		for key, value := range newKubeConfig.Clusters {
+			existingKubeConfig.Clusters[key] = value
+		}
+
+		// Merging Context
+		for key, value := range newKubeConfig.Contexts {
+			existingKubeConfig.Contexts[key] = value
+		}
+
+		// Merging Users
+		for key, value := range newKubeConfig.AuthInfos {
+			existingKubeConfig.AuthInfos[key] = value
+		}
+
+		clientcmd.WriteToFile(*existingKubeConfig, kubeconfigpath)
+		internal.LogReturn()
+		internal.LogYellow("Great ! Your config has been updated in ", kubeconfigpath)
+		internal.LogReturn()
+	}
 
 }
 
@@ -322,7 +363,7 @@ func main() {
 		switch os.Args[1] {
 		case "explain":
 			explainFlags.Parse(os.Args[2:])
-			explainCmd()
+			explainCmd(explainFlags)
 		case "token":
 			scopes := tokenFlags.String("scopes", internal.EmptyString, "The token scope ( default user ). For promote, use 'promote'.")
 			update := tokenFlags.Bool("update", false, "Update token directly in config")
@@ -355,7 +396,7 @@ func main() {
 			}
 		}
 	} else {
-		internal.LogLightRed("\nNo argument specified, please internal.ExitIfError the documentation:")
+		internal.LogLightRed("\nNo argument specified, please the documentation:")
 		internal.LogWhite("\n  kubi token: Generate / Update a kubi token\n  args:")
 		tokenFlags.PrintDefaults()
 		internal.LogWhite("\n  kubi config: Generate / Update a kube config\n  args:")
