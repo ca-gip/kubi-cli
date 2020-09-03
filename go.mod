@@ -9,6 +9,7 @@ require (
 	github.com/ghodss/yaml v0.0.0-20150909031657-73d445a93680
 	github.com/go-ozzo/ozzo-validation/v4 v4.2.2
 	github.com/mitchellh/go-homedir v1.1.0
+	github.com/spf13/pflag v1.0.5
 	golang.org/x/crypto v0.0.0-20190820162420-60c769a6c586
 	k8s.io/apimachinery v0.16.6 // indirect
 	k8s.io/client-go v0.16.6

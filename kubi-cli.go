@@ -176,7 +176,7 @@ func tokenCmd(flagSet *flag.FlagSet, kubiUrl *string, username *string, password
 
 	tokenbody, err := ioutil.ReadAll(resp.Body)
 	if resp.StatusCode != http.StatusCreated {
-		internal.LogRed("Error http %d during authentication\n", string(resp.StatusCode))
+		internal.LogRed(fmt.Sprintf("Error http %d during authentication\n", resp.StatusCode))
 		os.Exit(1)
 	}
 
@@ -188,10 +188,9 @@ func tokenCmd(flagSet *flag.FlagSet, kubiUrl *string, username *string, password
 		kubeConfig, err := clientcmd.LoadFromFile(kubeconfigpath)
 		internal.ExitIfError(err)
 
-		clusterName := strings.TrimPrefix(*kubiUrl, "https://kubi")
+		clusterName := strings.TrimPrefix(*kubiUrl, "https://kubi.")
 		username := fmt.Sprintf("%s_%s", *username, clusterName)
 
-		internal.LogLightGray("The user will be", username)
 		kubeConfig.AuthInfos[kubeConfig.Contexts[username].AuthInfo].Token = string(tokenbody)
 		clientcmd.WriteToFile(*kubeConfig, kubeconfigpath)
 		internal.LogYellow("The token has successfully been rotated !")
