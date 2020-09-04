@@ -347,6 +347,7 @@ func main() {
 	configFlags := flag.NewFlagSet("config", flag.ExitOnError)
 	explainFlags := flag.NewFlagSet("explain", flag.ExitOnError)
 	oldFlags := flag.NewFlagSet("old", flag.ExitOnError)
+	versionFlags := flag.NewFlagSet("version", flag.ExitOnError)
 
 	kubiUrl := commonFlags.String("kubi-url", internal.EmptyString, "Url to kubi server (ex: https://<kubi-ip>:<kubi-port>")
 	insecure := commonFlags.Bool("insecure", false, "Skip TLS verification")
@@ -373,6 +374,10 @@ func main() {
 			configFlags.Parse(os.Args[2:])
 			configCmd(configFlags, kubiUrl, username, password, insecure, useProxy)
 
+		case "version":
+			versionFlags.Parse(os.Args[2:])
+			internal.LogLightGray("1.8.3")
+			os.Exit(0)
 		default:
 			generateConfig := oldFlags.Bool("generate-config", false, "Generate a config in ~/.kube/config")
 			generateToken := oldFlags.Bool("generate-token", false, "Generate a token only")
@@ -401,6 +406,7 @@ func main() {
 		internal.LogWhite("\n  kubi config: Generate / Update a kube config\n  args:")
 		configFlags.PrintDefaults()
 		internal.LogWhite("\n  kubi explain: Generate / Update a kube config\n")
+		internal.LogWhite("\n  kubi version: show version of kubi\n")
 	}
 
 }
