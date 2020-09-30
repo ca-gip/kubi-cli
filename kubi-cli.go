@@ -355,6 +355,9 @@ func main() {
 	password := commonFlags.String("password", internal.EmptyString, "The password, use it at your own risks !")
 	useProxy := commonFlags.Bool("use-proxy", false, "Use default proxy or not")
 
+	scopes := tokenFlags.String("scopes", internal.EmptyString, "The token scope ( default user ). For promote, use 'promote'.")
+	update := tokenFlags.Bool("update", false, "Update token directly in config")
+
 	tokenFlags.AddFlagSet(commonFlags)
 	configFlags.AddFlagSet(commonFlags)
 	oldFlags.AddFlagSet(commonFlags)
@@ -365,8 +368,6 @@ func main() {
 			explainFlags.Parse(os.Args[2:])
 			explainCmd(explainFlags)
 		case "token":
-			scopes := tokenFlags.String("scopes", internal.EmptyString, "The token scope ( default user ). For promote, use 'promote'.")
-			update := tokenFlags.Bool("update", false, "Update token directly in config")
 			tokenFlags.Parse(os.Args[2:])
 			tokenCmd(tokenFlags, kubiUrl, username, password, insecure, useProxy, scopes, *update)
 
