@@ -6,16 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/TylerBrock/colorjson"
-	"github.com/ca-gip/kubi-cli/internals"
-	"github.com/dgrijalva/jwt-go"
-	"github.com/go-ozzo/ozzo-validation/v4"
-	"github.com/go-ozzo/ozzo-validation/v4/is"
-	"github.com/mitchellh/go-homedir"
-	flag "github.com/spf13/pflag"
-	"golang.org/x/crypto/ssh/terminal"
 	"io/ioutil"
-	"k8s.io/client-go/tools/clientcmd"
 	"log"
 	"net/http"
 	"net/url"
@@ -24,6 +15,16 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/TylerBrock/colorjson"
+	internal "github.com/ca-gip/kubi-cli/internals"
+	"github.com/dgrijalva/jwt-go"
+	validation "github.com/go-ozzo/ozzo-validation/v4"
+	"github.com/go-ozzo/ozzo-validation/v4/is"
+	"github.com/mitchellh/go-homedir"
+	flag "github.com/spf13/pflag"
+	"golang.org/x/crypto/ssh/terminal"
+	"k8s.io/client-go/tools/clientcmd"
 )
 
 type PartialJWT struct {
@@ -81,30 +82,28 @@ func explainCmd(flagSet *flag.FlagSet) {
 	json.Unmarshal(tokenTxt, &obj)
 
 	s, _ := f.Marshal(obj)
-	fmt.Println("\n\u001B[1;36mToken body:\u001B[0m\n")
+	internal.LogBlue("\nToken body:\n")
 	fmt.Println(string(s))
-	fmt.Println("\n")
-
 }
 
-func tokenCmd(flagSet *flag.FlagSet, kubiUrl *string, username *string, password *string, insecure *bool, useProxy *bool, scopes *string, update bool) {
+func tokenCmd(flagSet *flag.FlagSet, kubiURL *string, username *string, password *string, insecure *bool, useProxy *bool, scopes *string, update bool) {
 	if len(*username) == 0 {
 		internal.LogRed("No username found, please add '--username <username>' argument !")
 		internal.LogWhite("Supported Args:\n")
 		flagSet.PrintDefaults()
 		os.Exit(1)
 	}
-	if len(*kubiUrl) == 0 {
-		internal.LogRed("No kubiUrl found, please add '--kubi-url https://<host,fqdn>:<port>' argument !")
+	if len(*kubiURL) == 0 {
+		internal.LogRed("No kubiURL found, please add '--kubi-url https://<host,fqdn>:<port>' argument !")
 		internal.LogWhite("Supported Args:\n")
 		flagSet.PrintDefaults()
 		os.Exit(1)
 	}
 	// Gathering CA for cluster in insecure mode
-	if !strings.HasPrefix(*kubiUrl, "https://") {
-		*kubiUrl = "https://" + *kubiUrl
+	if !strings.HasPrefix(*kubiURL, "https://") {
+		*kubiURL = "https://" + *kubiURL
 	}
-	err := validation.Validate(&kubiUrl, is.RequestURL)
+	err := validation.Validate(&kubiURL, is.RequestURL)
 	internal.ExitIfError(err)
 	readPasswordIfEmpty(password)
 
@@ -116,13 +115,13 @@ func tokenCmd(flagSet *flag.FlagSet, kubiUrl *string, username *string, password
 	}
 	internal.ExitIfError(err)
 
-	caResp, err := http.DefaultClient.Get(*kubiUrl + "/ca")
+	caResp, err := http.DefaultClient.Get(*kubiURL + "/ca")
 	internal.ExitIfError(err)
 	body, err := ioutil.ReadAll(caResp.Body)
 	internal.ExitIfError(err)
 	ca := body
 
-	base, _ := url.Parse(fmt.Sprintf("%v", *kubiUrl))
+	base, _ := url.Parse(fmt.Sprintf("%v", *kubiURL))
 	base.Path += "token"
 	params := url.Values{
 		"scopes": []string{*scopes},
@@ -188,7 +187,7 @@ func tokenCmd(flagSet *flag.FlagSet, kubiUrl *string, username *string, password
 		kubeConfig, err := clientcmd.LoadFromFile(kubeconfigpath)
 		internal.ExitIfError(err)
 
-		clusterName := strings.TrimPrefix(*kubiUrl, "https://kubi.")
+		clusterName := strings.TrimPrefix(*kubiURL, "https://kubi.")
 		username := fmt.Sprintf("%s_%s", *username, clusterName)
 
 		kubeConfig.AuthInfos[kubeConfig.Contexts[username].AuthInfo].Token = string(tokenbody)
@@ -202,24 +201,24 @@ func tokenCmd(flagSet *flag.FlagSet, kubiUrl *string, username *string, password
 
 }
 
-func configCmd(flagSet *flag.FlagSet, kubiUrl *string, username *string, password *string, insecure *bool, useProxy *bool) {
+func configCmd(flagSet *flag.FlagSet, kubiURL *string, username *string, password *string, insecure *bool, useProxy *bool) {
 	if len(*username) == 0 {
 		internal.LogRed("No username found, please add '--username <username>' argument !")
 		internal.LogWhite("Supported Args:\n")
 		flagSet.PrintDefaults()
 		os.Exit(1)
 	}
-	if len(*kubiUrl) == 0 {
-		internal.LogRed("No kubiUrl found, please add '--kubi-url https://<host,fqdn>:<port>' argument !")
+	if len(*kubiURL) == 0 {
+		internal.LogRed("No kubiURL found, please add '--kubi-url https://<host,fqdn>:<port>' argument !")
 		internal.LogWhite("Supported Args:\n")
 		flagSet.PrintDefaults()
 		os.Exit(1)
 	}
 	// Gathering CA for cluster in insecure mode
-	if !strings.HasPrefix(*kubiUrl, "https://") {
-		*kubiUrl = "https://" + *kubiUrl
+	if !strings.HasPrefix(*kubiURL, "https://") {
+		*kubiURL = "https://" + *kubiURL
 	}
-	err := validation.Validate(&kubiUrl, is.RequestURL)
+	err := validation.Validate(&kubiURL, is.RequestURL)
 	internal.ExitIfError(err)
 	readPasswordIfEmpty(password)
 	// Gathering CA for cluster in insecure mode
@@ -229,13 +228,13 @@ func configCmd(flagSet *flag.FlagSet, kubiUrl *string, username *string, passwor
 	} else {
 		http.DefaultTransport.(*http.Transport).Proxy = nil
 	}
-	caResp, err := http.DefaultClient.Get(*kubiUrl + "/ca")
+	caResp, err := http.DefaultClient.Get(*kubiURL + "/ca")
 	internal.ExitIfError(err)
 	body, err := ioutil.ReadAll(caResp.Body)
 	internal.ExitIfError(err)
 	ca := body
 
-	wurl := fmt.Sprintf("%v/config", *kubiUrl)
+	wurl := fmt.Sprintf("%v/config", *kubiURL)
 
 	req, err := http.NewRequest(http.MethodGet, wurl, nil)
 	req.SetBasicAuth(*username, *password)
@@ -349,7 +348,7 @@ func main() {
 	oldFlags := flag.NewFlagSet("old", flag.ExitOnError)
 	versionFlags := flag.NewFlagSet("version", flag.ExitOnError)
 
-	kubiUrl := commonFlags.String("kubi-url", internal.EmptyString, "Url to kubi server (ex: https://<kubi-ip>:<kubi-port>")
+	kubiURL := commonFlags.String("kubi-url", internal.EmptyString, "Url to kubi server (ex: https://<kubi-ip>:<kubi-port>")
 	insecure := commonFlags.Bool("insecure", false, "Skip TLS verification")
 	username := commonFlags.String("username", internal.EmptyString, "Your username for connection")
 	password := commonFlags.String("password", internal.EmptyString, "The password, use it at your own risks !")
@@ -369,11 +368,11 @@ func main() {
 			explainCmd(explainFlags)
 		case "token":
 			tokenFlags.Parse(os.Args[2:])
-			tokenCmd(tokenFlags, kubiUrl, username, password, insecure, useProxy, scopes, *update)
+			tokenCmd(tokenFlags, kubiURL, username, password, insecure, useProxy, scopes, *update)
 
 		case "config":
 			configFlags.Parse(os.Args[2:])
-			configCmd(configFlags, kubiUrl, username, password, insecure, useProxy)
+			configCmd(configFlags, kubiURL, username, password, insecure, useProxy)
 
 		case "version":
 			versionFlags.Parse(os.Args[2:])
@@ -390,9 +389,9 @@ func main() {
 
 			}
 			if *generateToken {
-				configCmd(oldFlags, kubiUrl, username, password, insecure, useProxy)
+				configCmd(oldFlags, kubiURL, username, password, insecure, useProxy)
 			} else if *generateConfig {
-				configCmd(oldFlags, kubiUrl, username, password, insecure, useProxy)
+				configCmd(oldFlags, kubiURL, username, password, insecure, useProxy)
 			} else {
 				internal.LogReturn()
 				internal.LogRed("\tThe usage of old command style is deprecated: please use kubi token, kubi config or kubi explain")
@@ -401,7 +400,7 @@ func main() {
 			}
 		}
 	} else {
-		internal.LogLightRed("\nNo argument specified, please the documentation:")
+		internal.LogLightRed("\nNo argument specified, please read the documentation:")
 		internal.LogWhite("\n  kubi token: Generate / Update a kubi token\n  args:")
 		tokenFlags.PrintDefaults()
 		internal.LogWhite("\n  kubi config: Generate / Update a kube config\n  args:")
