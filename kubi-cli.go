@@ -197,7 +197,7 @@ func tokenCmd(flagSet *flag.FlagSet, kubiURL *string, username *string, password
 	}
 
 	internal.ExitIfError(err)
-	internal.LogLightGray(string(tokenbody))
+	fmt.Println(string(tokenbody))
 
 }
 
