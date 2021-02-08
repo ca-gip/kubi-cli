@@ -18,7 +18,7 @@ const EmptyString = ""
 // try using it to prevent further errors.
 func FileExists(filename string) bool {
 	info, err := os.Stat(filename)
-	if os.IsNotExist(err) {
+	if os.IsNotExist(err) || os.IsPermission(err) {
 		return false
 	}
 	return !info.IsDir()
