@@ -25,7 +25,6 @@ func FileExists(filename string) bool {
 			return false
 		}
 		ExitIfError(err)
-		os.Exit(1)
 	}
 
 	return !info.IsDir()
