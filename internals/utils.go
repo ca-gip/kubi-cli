@@ -1,6 +1,8 @@
 package internal
 
-import "os"
+import (
+	"os"
+)
 
 func ExitIfError(e error) {
 	if e != nil {
@@ -18,8 +20,12 @@ const EmptyString = ""
 // try using it to prevent further errors.
 func FileExists(filename string) bool {
 	info, err := os.Stat(filename)
-	if os.IsNotExist(err) {
-		return false
+	if err != nil {
+		if os.IsNotExist(err){
+			return false
+		}
+		ExitIfError(err)
 	}
+
 	return !info.IsDir()
 }
