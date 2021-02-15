@@ -39,7 +39,7 @@ func explainCmd(flagSet *flag.FlagSet) {
 	if len(flagSet.Args()) == 1 {
 		token = flagSet.Arg(0)
 		if len(strings.Split(token, ".")) != 3 {
-			internal.ExitIfError(errors.New(fmt.Sprintf("The token: %s is not a valid jwt token.\n", token)))
+			internal.ExitIfError(fmt.Errorf("the token: %s is not a valid jwt token.\n", token))
 		}
 	} else {
 		internal.LogLightGray("Using the kube config file for token explain")
@@ -54,7 +54,7 @@ func explainCmd(flagSet *flag.FlagSet) {
 		}
 		token = kubeConfig.AuthInfos[kubeConfig.Contexts[kubeConfig.CurrentContext].AuthInfo].Token
 		if token == internal.EmptyString {
-			internal.ExitIfError(errors.New(fmt.Sprintf("No token found for the context: %s", kubeConfig.CurrentContext)))
+			internal.ExitIfError(fmt.Errorf("no token found for the context: %s", kubeConfig.CurrentContext))
 		}
 		token = kubeConfig.AuthInfos[kubeConfig.Contexts[kubeConfig.CurrentContext].AuthInfo].Token
 	}
