@@ -39,7 +39,7 @@ func explainCmd(flagSet *flag.FlagSet) {
 	if len(flagSet.Args()) == 1 {
 		token = flagSet.Arg(0)
 		if len(strings.Split(token, ".")) != 3 {
-			internal.ExitIfError(errors.New(fmt.Sprintf("The token: %s is not a valid jwt token.\n", token)))
+			internal.ExitIfError(fmt.Errorf("the token: %s is not a valid jwt token.\n", token))
 		}
 	} else {
 		internal.LogLightGray("Using the kube config file for token explain")
@@ -50,11 +50,11 @@ func explainCmd(flagSet *flag.FlagSet) {
 		internal.ExitIfError(err)
 
 		if kubeConfig.CurrentContext == internal.EmptyString {
-			internal.ExitIfError(errors.New("No current context found in kubeconfig"))
+			internal.ExitIfError(errors.New("no current context found in kubeconfig"))
 		}
 		token = kubeConfig.AuthInfos[kubeConfig.Contexts[kubeConfig.CurrentContext].AuthInfo].Token
 		if token == internal.EmptyString {
-			internal.ExitIfError(errors.New(fmt.Sprintf("No token found for the context: %s", kubeConfig.CurrentContext)))
+			internal.ExitIfError(fmt.Errorf("no token found for the context: %s", kubeConfig.CurrentContext))
 		}
 		token = kubeConfig.AuthInfos[kubeConfig.Contexts[kubeConfig.CurrentContext].AuthInfo].Token
 	}
@@ -79,7 +79,8 @@ func explainCmd(flagSet *flag.FlagSet) {
 
 	// Formatting json
 	var obj map[string]interface{}
-	json.Unmarshal(tokenTxt, &obj)
+	err = json.Unmarshal(tokenTxt, &obj)
+	internal.ExitIfError(err)
 
 	s, _ := f.Marshal(obj)
 	internal.LogBlue("\nToken body:\n")
@@ -130,6 +131,7 @@ func tokenCmd(flagSet *flag.FlagSet, kubiURL *string, username *string, password
 	wurl := base.String()
 
 	req, err := http.NewRequest(http.MethodGet, wurl, nil)
+	internal.ExitIfError(err)
 	req.SetBasicAuth(*username, *password)
 
 	var resp *http.Response
@@ -191,7 +193,8 @@ func tokenCmd(flagSet *flag.FlagSet, kubiURL *string, username *string, password
 		username := fmt.Sprintf("%s_%s", *username, clusterName)
 
 		kubeConfig.AuthInfos[kubeConfig.Contexts[username].AuthInfo].Token = string(tokenbody)
-		clientcmd.WriteToFile(*kubeConfig, kubeconfigpath)
+		err = clientcmd.WriteToFile(*kubeConfig, kubeconfigpath)
+		internal.ExitIfError(err)
 		internal.LogYellow("The token has successfully been rotated !")
 		os.Exit(0)
 	}
@@ -237,6 +240,10 @@ func configCmd(flagSet *flag.FlagSet, kubiURL *string, username *string, passwor
 	wurl := fmt.Sprintf("%v/config", *kubiURL)
 
 	req, err := http.NewRequest(http.MethodGet, wurl, nil)
+	internal.ExitIfError(err)
+	if req == nil {
+		internal.ExitIfError(errors.New("unexpected behaviour while forging request"))
+	}
 	req.SetBasicAuth(*username, *password)
 
 	var resp *http.Response
@@ -287,8 +294,7 @@ func configCmd(flagSet *flag.FlagSet, kubiURL *string, username *string, passwor
 	}
 
 	internal.ExitIfError(err)
-
-	user, err := user.Current()
+	currentUser, err := user.Current()
 	internal.ExitIfError(err)
 
 	kubeconfigpath, err := findKubeConfig()
@@ -296,15 +302,17 @@ func configCmd(flagSet *flag.FlagSet, kubiURL *string, username *string, passwor
 
 	if !internal.FileExists(kubeconfigpath) {
 		internal.LogNormal("Kubeconfig doesn't existing, it will be created.")
-		os.MkdirAll(user.HomeDir+"/.kube", 0600)
-		f, err := os.Create(user.HomeDir + "/.kube/config")
+		err = os.MkdirAll(currentUser.HomeDir+"/.kube", 0600)
 		internal.ExitIfError(err)
-		f.Chmod(0600)
+		f, err := os.Create(currentUser.HomeDir + "/.kube/config")
+		internal.ExitIfError(err)
+		err = f.Chmod(0600)
 		internal.ExitIfError(err)
 
 		newKubeConfig, err := clientcmd.Load(tokenbody)
 		internal.ExitIfError(err)
-		clientcmd.WriteToFile(*newKubeConfig, kubeconfigpath)
+		err = clientcmd.WriteToFile(*newKubeConfig, kubeconfigpath)
+		internal.ExitIfError(err)
 
 		internal.LogReturn()
 		internal.LogYellow("Great ! Your config has been created in ", kubeconfigpath)
@@ -331,7 +339,8 @@ func configCmd(flagSet *flag.FlagSet, kubiURL *string, username *string, passwor
 			existingKubeConfig.AuthInfos[key] = value
 		}
 
-		clientcmd.WriteToFile(*existingKubeConfig, kubeconfigpath)
+		err = clientcmd.WriteToFile(*existingKubeConfig, kubeconfigpath)
+		internal.ExitIfError(err)
 		internal.LogReturn()
 		internal.LogYellow("Great ! Your config has been updated in ", kubeconfigpath)
 		internal.LogReturn()
@@ -364,24 +373,29 @@ func main() {
 	if len(os.Args) > 1 {
 		switch os.Args[1] {
 		case "explain":
-			explainFlags.Parse(os.Args[2:])
+			err := explainFlags.Parse(os.Args[2:])
+			internal.ExitIfError(err)
 			explainCmd(explainFlags)
 		case "token":
-			tokenFlags.Parse(os.Args[2:])
+			err := tokenFlags.Parse(os.Args[2:])
+			internal.ExitIfError(err)
 			tokenCmd(tokenFlags, kubiURL, username, password, insecure, useProxy, scopes, *update)
 
 		case "config":
-			configFlags.Parse(os.Args[2:])
+			err :=  configFlags.Parse(os.Args[2:])
+			internal.ExitIfError(err)
 			configCmd(configFlags, kubiURL, username, password, insecure, useProxy)
 
 		case "version":
-			versionFlags.Parse(os.Args[2:])
+			err := versionFlags.Parse(os.Args[2:])
+			internal.ExitIfError(err)
 			internal.LogLightGray("1.8.5")
 			os.Exit(0)
 		default:
 			generateConfig := oldFlags.Bool("generate-config", false, "Generate a config in ~/.kube/config")
 			generateToken := oldFlags.Bool("generate-token", false, "Generate a token only")
-			oldFlags.Parse(os.Args[1:])
+			err := oldFlags.Parse(os.Args[1:])
+			internal.ExitIfError(err)
 			if *generateConfig {
 				internal.LogReturn()
 				internal.LogRed("Deprecated: Please use 'kubi config' instead of 'kubi --generate-config'")
