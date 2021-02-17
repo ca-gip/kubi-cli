@@ -35,7 +35,7 @@ elif [ "$(expr substr $(uname -s) 1 5)" == "Windows" ]; then
   mkdir -p /tmp/kubi-cli
   curl -s  https://api.github.com/repos/ca-gip/kubi-cli/releases/latest \
     | grep browser_download_url \
-    | grep linux_amd64 \
+    | grep windows_amd64 \
     | cut -d '"' -f 4 \
     | xargs curl -sL \
     | tar xzf - -C /tmp/kubi-cli
