@@ -17,8 +17,6 @@ builds:
       - freebsd
     goarch:
       - amd64
-      - arm64
-      - arm
       - 386
     flags:
       - -trimpath
