@@ -3,6 +3,11 @@
 Kubi-cli is a Kubernetes IAM authentication client aloow you to consume
 securely ( eg: without skipping tls verification) Kubi token.
 
+# Versioning
+Since version v0.24.0, we have decided to modify the naming of versions for ease of reading and understanding.
+
+Example: v0.24.0 means that the operator was developed for Kubernetes version 1.24 and that the last 0 corresponds to the various patches we have made to the operator.
+
 ## Usage
 
 You can simple call `kubi` with `-h` parameter.
