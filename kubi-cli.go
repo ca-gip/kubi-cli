@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"net/http"
 	"net/url"
@@ -23,7 +23,7 @@ import (
 	"github.com/go-ozzo/ozzo-validation/v4/is"
 	"github.com/mitchellh/go-homedir"
 	flag "github.com/spf13/pflag"
-	"golang.org/x/crypto/ssh/terminal"
+	"golang.org/x/term"
 	"k8s.io/client-go/tools/clientcmd"
 )
 
@@ -118,7 +118,7 @@ func tokenCmd(flagSet *flag.FlagSet, kubiURL *string, username *string, password
 
 	caResp, err := http.DefaultClient.Get(*kubiURL + "/ca")
 	internal.ExitIfError(err)
-	body, err := ioutil.ReadAll(caResp.Body)
+	body, err := io.ReadAll(caResp.Body)
 	internal.ExitIfError(err)
 	ca := body
 
@@ -175,7 +175,7 @@ func tokenCmd(flagSet *flag.FlagSet, kubiURL *string, username *string, password
 	}
 	internal.ExitIfError(err)
 
-	tokenbody, err := ioutil.ReadAll(resp.Body)
+	tokenbody, err := io.ReadAll(resp.Body)
 	if resp.StatusCode != http.StatusCreated {
 		internal.LogRed(fmt.Sprintf("Error http %d during authentication\n", resp.StatusCode))
 		os.Exit(1)
@@ -233,7 +233,7 @@ func configCmd(flagSet *flag.FlagSet, kubiURL *string, username *string, passwor
 	}
 	caResp, err := http.DefaultClient.Get(*kubiURL + "/ca")
 	internal.ExitIfError(err)
-	body, err := ioutil.ReadAll(caResp.Body)
+	body, err := io.ReadAll(caResp.Body)
 	internal.ExitIfError(err)
 	ca := body
 
@@ -287,7 +287,7 @@ func configCmd(flagSet *flag.FlagSet, kubiURL *string, username *string, passwor
 	}
 	internal.ExitIfError(err)
 
-	tokenbody, err := ioutil.ReadAll(resp.Body)
+	tokenbody, err := io.ReadAll(resp.Body)
 	if resp.StatusCode != http.StatusCreated {
 		internal.LogRed(fmt.Sprintf("Error http %d during authentication\n", resp.StatusCode))
 		os.Exit(1)
@@ -382,14 +382,14 @@ func main() {
 			tokenCmd(tokenFlags, kubiURL, username, password, insecure, useProxy, scopes, *update)
 
 		case "config":
-			err :=  configFlags.Parse(os.Args[2:])
+			err := configFlags.Parse(os.Args[2:])
 			internal.ExitIfError(err)
 			configCmd(configFlags, kubiURL, username, password, insecure, useProxy)
 
 		case "version":
 			err := versionFlags.Parse(os.Args[2:])
 			internal.ExitIfError(err)
-			internal.LogLightGray("1.8.6")
+			internal.LogLightGray("0.24.0")
 			os.Exit(0)
 		default:
 			generateConfig := oldFlags.Bool("generate-config", false, "Generate a config in ~/.kube/config")
@@ -428,7 +428,7 @@ func main() {
 func readPasswordIfEmpty(password *string) {
 	if len(*password) == 0 {
 		fmt.Print("Enter your password: ")
-		bytePassword, err := terminal.ReadPassword(int(syscall.Stdin))
+		bytePassword, err := term.ReadPassword(int(syscall.Stdin))
 		fmt.Println()
 		internal.ExitIfError(err)
 		*password = string(bytePassword)

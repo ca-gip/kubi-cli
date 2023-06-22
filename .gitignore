@@ -2,3 +2,4 @@ vendor
 .idea
 glide.lock
 /bin/*
+dist/
