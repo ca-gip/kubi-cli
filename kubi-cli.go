@@ -400,11 +400,7 @@ func main() {
 				internal.LogReturn()
 				internal.LogRed("Deprecated: Please use 'kubi config' instead of 'kubi --generate-config'")
 				internal.LogReturn()
-
-			}
-			if *generateToken {
-				configCmd(oldFlags, kubiURL, username, password, insecure, useProxy)
-			} else if *generateConfig {
+			} else if *generateToken {
 				configCmd(oldFlags, kubiURL, username, password, insecure, useProxy)
 			} else {
 				internal.LogReturn()
