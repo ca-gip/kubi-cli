@@ -362,9 +362,8 @@ func main() {
 	username := commonFlags.String("username", internal.EmptyString, "Your username for connection")
 	password := commonFlags.String("password", internal.EmptyString, "The password, use it at your own risks !")
 	useProxy := commonFlags.Bool("use-proxy", false, "Use default proxy or not")
-
-	scopes := tokenFlags.String("scopes", internal.EmptyString, "The token scope ( default user ). For promote, use 'promote'.")
-	update := tokenFlags.Bool("update", false, "Update token directly in config")
+	scopes := commonFlags.String("scopes", internal.EmptyString, "The token scope ( default user ). For promote, use 'promote'.")
+	update := commonFlags.Bool("update", false, "Update token directly in config")
 
 	tokenFlags.AddFlagSet(commonFlags)
 	configFlags.AddFlagSet(commonFlags)
@@ -401,7 +400,7 @@ func main() {
 				internal.LogRed("Deprecated: Please use 'kubi config' instead of 'kubi --generate-config'")
 				internal.LogReturn()
 			} else if *generateToken {
-				configCmd(oldFlags, kubiURL, username, password, insecure, useProxy)
+				tokenCmd(oldFlags, kubiURL, username, password, insecure, useProxy, scopes, *update)
 			} else {
 				internal.LogReturn()
 				internal.LogRed("\tThe usage of old command style is deprecated: please use kubi token, kubi config or kubi explain")
