@@ -391,8 +391,8 @@ func main() {
 			internal.LogLightGray("0.24.0")
 			os.Exit(0)
 		default:
-			generateConfig := oldFlags.Bool("generate-config", false, "Generate a config in ~/.kube/config")
-			generateToken := oldFlags.Bool("generate-token", false, "Generate a token only")
+			generateConfig := oldFlags.Bool("generate-config", false, "Generate a config in ~/.kube/config (Deprecated)")
+			generateToken := oldFlags.Bool("generate-token", false, "Generate a token only (Deprecated)")
 			err := oldFlags.Parse(os.Args[1:])
 			internal.ExitIfError(err)
 			if *generateConfig {
@@ -400,6 +400,8 @@ func main() {
 				internal.LogRed("Deprecated: Please use 'kubi config' instead of 'kubi --generate-config'")
 				internal.LogReturn()
 			} else if *generateToken {
+				internal.LogRed("Deprecated: Please use 'kubi token' instead of 'kubi --generate-token'")
+				internal.LogReturn()
 				tokenCmd(oldFlags, kubiURL, username, password, insecure, useProxy, scopes, *update)
 			} else {
 				internal.LogReturn()
