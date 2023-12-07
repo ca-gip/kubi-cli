@@ -389,7 +389,7 @@ func main() {
 		case "version":
 			err := versionFlags.Parse(os.Args[2:])
 			internal.ExitIfError(err)
-			internal.LogLightGray("0.26.0")
+			internal.LogLightGray("1.26.0")
 			os.Exit(0)
 		default:
 			generateConfig := oldFlags.Bool("generate-config", false, "Generate a config in ~/.kube/config")
