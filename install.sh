@@ -64,6 +64,7 @@ get_binaries() {
   case "$PLATFORM" in
     darwin/386) BINARIES="kubi" ;;
     darwin/amd64) BINARIES="kubi" ;;
+    darwin/arm64) BINARIES="kubi" ;;
     freebsd/386) BINARIES="kubi" ;;
     freebsd/amd64) BINARIES="kubi" ;;
     linux/386) BINARIES="kubi" ;;
