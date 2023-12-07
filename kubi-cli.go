@@ -362,9 +362,8 @@ func main() {
 	username := commonFlags.String("username", internal.EmptyString, "Your username for connection")
 	password := commonFlags.String("password", internal.EmptyString, "The password, use it at your own risks !")
 	useProxy := commonFlags.Bool("use-proxy", false, "Use default proxy or not")
-
-	scopes := tokenFlags.String("scopes", internal.EmptyString, "The token scope ( default user ). For promote, use 'promote'.")
-	update := tokenFlags.Bool("update", false, "Update token directly in config")
+	scopes := commonFlags.String("scopes", internal.EmptyString, "The token scope ( default user ). For promote, use 'promote'.")
+	update := commonFlags.Bool("update", false, "Update token directly in config")
 
 	tokenFlags.AddFlagSet(commonFlags)
 	configFlags.AddFlagSet(commonFlags)
@@ -392,20 +391,18 @@ func main() {
 			internal.LogLightGray("0.24.0")
 			os.Exit(0)
 		default:
-			generateConfig := oldFlags.Bool("generate-config", false, "Generate a config in ~/.kube/config")
-			generateToken := oldFlags.Bool("generate-token", false, "Generate a token only")
+			generateConfig := oldFlags.Bool("generate-config", false, "Generate a config in ~/.kube/config (Deprecated)")
+			generateToken := oldFlags.Bool("generate-token", false, "Generate a token only (Deprecated)")
 			err := oldFlags.Parse(os.Args[1:])
 			internal.ExitIfError(err)
 			if *generateConfig {
 				internal.LogReturn()
 				internal.LogRed("Deprecated: Please use 'kubi config' instead of 'kubi --generate-config'")
 				internal.LogReturn()
-
-			}
-			if *generateToken {
-				configCmd(oldFlags, kubiURL, username, password, insecure, useProxy)
-			} else if *generateConfig {
-				configCmd(oldFlags, kubiURL, username, password, insecure, useProxy)
+			} else if *generateToken {
+				internal.LogRed("Deprecated: Please use 'kubi token' instead of 'kubi --generate-token'")
+				internal.LogReturn()
+				tokenCmd(oldFlags, kubiURL, username, password, insecure, useProxy, scopes, *update)
 			} else {
 				internal.LogReturn()
 				internal.LogRed("\tThe usage of old command style is deprecated: please use kubi token, kubi config or kubi explain")
