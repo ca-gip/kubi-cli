@@ -1,6 +1,6 @@
 module github.com/ca-gip/kubi-cli
 
-go 1.23.3
+go 1.24
 
 require (
 	github.com/TylerBrock/colorjson v0.0.0-20200706003622-8a50f05110d2
