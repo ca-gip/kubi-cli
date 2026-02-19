@@ -3,6 +3,7 @@ package main
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -18,7 +19,6 @@ import (
 
 	"github.com/TylerBrock/colorjson"
 	internal "github.com/ca-gip/kubi-cli/internals"
-	"github.com/dgrijalva/jwt-go"
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/go-ozzo/ozzo-validation/v4/is"
 	"github.com/mitchellh/go-homedir"
@@ -59,7 +59,7 @@ func explainCmd(flagSet *flag.FlagSet) {
 		token = kubeConfig.AuthInfos[kubeConfig.Contexts[kubeConfig.CurrentContext].AuthInfo].Token
 	}
 
-	tokenTxt, err := jwt.DecodeSegment(strings.Split(token, ".")[1])
+	tokenTxt, err := base64.RawURLEncoding.DecodeString(strings.Split(token, ".")[1])
 
 	// Deserialize ExpireAt Field only
 	var v PartialJWT
@@ -389,7 +389,7 @@ func main() {
 		case "version":
 			err := versionFlags.Parse(os.Args[2:])
 			internal.ExitIfError(err)
-			internal.LogLightGray("1.30.0")
+			internal.LogLightGray("1.32.0")
 			os.Exit(0)
 		default:
 			generateConfig := oldFlags.Bool("generate-config", false, "Generate a config in ~/.kube/config")
