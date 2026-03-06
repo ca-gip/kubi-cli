@@ -101,10 +101,6 @@ adjust_format() {
   esac
   true
 }
-adjust_os() {
-  # adjust archive name based on OS
-  true
-}
 adjust_arch() {
   # adjust archive name based on ARCH
   case ${ARCH} in
