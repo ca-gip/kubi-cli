@@ -67,8 +67,10 @@ get_binaries() {
     darwin/arm64) BINARIES="kubi" ;;
     freebsd/386) BINARIES="kubi" ;;
     freebsd/amd64) BINARIES="kubi" ;;
+    freebsd/arm64) BINARIES="kubi" ;;
     linux/386) BINARIES="kubi" ;;
     linux/amd64) BINARIES="kubi" ;;
+    linux/arm64) BINARIES="kubi" ;;
     windows/386) BINARIES="kubi" ;;
     windows/amd64) BINARIES="kubi" ;;
     *)
@@ -101,10 +103,6 @@ adjust_format() {
 }
 adjust_os() {
   # adjust archive name based on OS
-  case ${OS} in
-    386) OS=i386 ;;
-    amd64) OS=x86_64 ;;
-  esac
   true
 }
 adjust_arch() {
