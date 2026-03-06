@@ -367,8 +367,6 @@ tag_to_version
 
 adjust_format
 
-adjust_os
-
 adjust_arch
 
 log_info "found version: ${VERSION} for ${TAG}/${OS}/${ARCH}"
