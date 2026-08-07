@@ -39,7 +39,7 @@ func explainCmd(flagSet *flag.FlagSet) {
 	if len(flagSet.Args()) == 1 {
 		token = flagSet.Arg(0)
 		if len(strings.Split(token, ".")) != 3 {
-			internal.ExitIfError(fmt.Errorf("the token: %s is not a valid jwt token.\n", token))
+			internal.ExitIfError(fmt.Errorf("the token: %s is not a valid jwt token", token))
 		}
 	} else {
 		internal.LogLightGray("Using the kube config file for token explain")
@@ -389,7 +389,7 @@ func main() {
 		case "version":
 			err := versionFlags.Parse(os.Args[2:])
 			internal.ExitIfError(err)
-			internal.LogLightGray("1.34.0")
+			internal.LogLightGray("1.36.0")
 			os.Exit(0)
 		default:
 			generateConfig := oldFlags.Bool("generate-config", false, "Generate a config in ~/.kube/config")
